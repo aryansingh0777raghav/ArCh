@@ -83,11 +83,11 @@ class CustomCrawlerProvider(SearchProvider):
                     images = []
                     
                     # Check OpenGraph and Twitter images
-                    og_img = soup.find("meta", property="og:image")
+                    og_img = soup.find("meta", attrs={"property": "og:image"})
                     if og_img and og_img.get("content"):
                         images.append(urllib.parse.urljoin(url, og_img.get("content")))
                         
-                    tw_img = soup.find("meta", name="twitter:image")
+                    tw_img = soup.find("meta", attrs={"name": "twitter:image"})
                     if tw_img and tw_img.get("content"):
                         images.append(urllib.parse.urljoin(url, tw_img.get("content")))
                         

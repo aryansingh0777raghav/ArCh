@@ -196,9 +196,39 @@ class SearchBot:
                 max_tokens=4000,
                 response_format={"type": "json_object"}
             )
-            
             raw_response = response.choices[0].message.content.strip()
             
+        except Exception as e:
+            err_msg = str(e)
+            if ("rate_limit" in err_msg.lower() or "429" in err_msg) and model != "llama-3.1-8b-instant":
+                print(f"SearchBot: Rate limit (429) hit for {model}. Retrying with fast fallback model llama-3.1-8b-instant...")
+                try:
+                    client = AsyncGroq(api_key=api_key)
+                    response = await client.chat.completions.create(
+                        model="llama-3.1-8b-instant",
+                        messages=messages,
+                        temperature=0.3,
+                        max_tokens=4000,
+                        response_format={"type": "json_object"}
+                    )
+                    raw_response = response.choices[0].message.content.strip()
+                except Exception as retry_err:
+                    print(f"SearchBot: Fallback to llama-3.1-8b-instant also failed: {retry_err}")
+                    return {
+                        "answer": f"Groq API Rate Limit reached for {model}, and fallback model also failed: {str(retry_err)}.\n\nPlease try again in a few minutes or configure a different Groq API key.",
+                        "key_facts": [],
+                        "follow_ups": [f"Retry: {query}"]
+                    }
+            else:
+                print(f"Error calling Groq API: {e}")
+                return {
+                    "answer": f"An error occurred while generating the AI answer: {str(e)}.\n\nPlease verify your Groq API Key and internet connection.",
+                    "key_facts": [],
+                    "follow_ups": [f"Retry: {query}"]
+                }
+
+        # Parse and process JSON response (shared success block)
+        try:
             # Clean response if markdown blocks are returned
             if raw_response.startswith("```"):
                 raw_response = re.sub(r'^```(?:json)?\n', '', raw_response)
@@ -223,13 +253,6 @@ class SearchBot:
                 "answer": raw_response if 'raw_response' in locals() else "Error parsing response from Groq AI.",
                 "key_facts": [],
                 "follow_ups": [f"Tell me more about {query}"]
-            }
-        except Exception as e:
-            print(f"Error calling Groq API: {e}")
-            return {
-                "answer": f"An error occurred while generating the AI answer: {str(e)}.\n\nPlease verify your Groq API Key and internet connection.",
-                "key_facts": [],
-                "follow_ups": [f"Retry: {query}"]
             }
 
     def _generate_no_key_fallback(self, query: str, sources: list) -> dict:
