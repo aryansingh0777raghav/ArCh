@@ -10,7 +10,11 @@ let currentHistoryId = null;
 let activeView = "home";
 let appSettings = {};
 let activeSources = [];
+let activeImages = [];
 let triggeredByVoice = false;
+let isDeepResearch = false;
+let activeMode = "standard"; // "standard" or "storyboard"
+let attachedDirectory = null;
 
 // DOM Elements
 const bodyEl = document.body;
@@ -56,6 +60,29 @@ const settingVoiceLang = document.getElementById("setting-voice-lang");
 const btnSaveSettings = document.getElementById("btn-save-settings");
 const settingsStatus = document.getElementById("settings-status");
 const toast = document.getElementById("toast");
+
+// Next-Gen UI Bindings
+const tabModeStandard = document.getElementById("tab-mode-standard");
+const tabModeStoryboard = document.getElementById("tab-mode-storyboard");
+const toggleDeepResearch = document.getElementById("toggle-deep-research");
+const btnAttachDir = document.getElementById("btn-attach-dir");
+const btnAttachDirFollowup = document.getElementById("btn-attach-dir-followup");
+const attachedDirBadge = document.getElementById("attached-dir-badge");
+const attachedDirBadgeFollowup = document.getElementById("attached-dir-badge-followup");
+const deepResearchBadgeFollowup = document.getElementById("deep-research-badge-followup");
+const tabSources = document.getElementById("tab-sources");
+const tabVisuals = document.getElementById("tab-visuals");
+const sourcesTabContent = document.getElementById("sources-tab-content");
+const visualsTabContent = document.getElementById("visuals-tab-content");
+const visualsGrid = document.getElementById("visuals-grid");
+const creatorSpotlightWrapper = document.getElementById("creator-spotlight-wrapper");
+const btnCreatorHub = document.getElementById("btn-creator-hub");
+const creatorHubModal = document.getElementById("creator-hub-modal");
+const btnCloseCreatorHub = document.getElementById("btn-close-creator-hub");
+const imageLightbox = document.getElementById("image-lightbox");
+const lightboxImg = document.getElementById("lightbox-img");
+const lightboxCaption = document.getElementById("lightbox-caption");
+const closeLightbox = document.querySelector(".close-lightbox");
 
 // Initialize Application
 document.addEventListener("DOMContentLoaded", () => {
@@ -147,6 +174,120 @@ function setupEventListeners() {
 
     // Clear History
     btnClearHistory.addEventListener("click", clearAllHistory);
+
+    // --- Next-Gen Event Listeners ---
+    
+    // Mode Switcher Tabs
+    if (tabModeStandard && tabModeStoryboard) {
+        tabModeStandard.addEventListener("click", () => {
+            activeMode = "standard";
+            tabModeStandard.classList.add("active");
+            tabModeStoryboard.classList.remove("active");
+            searchInput.placeholder = "Ask anything... (e.g. Who is Aryan Singh Filmmaker from Gorakhpur?)";
+        });
+        tabModeStoryboard.addEventListener("click", () => {
+            activeMode = "storyboard";
+            tabModeStoryboard.classList.add("active");
+            tabModeStandard.classList.remove("active");
+            searchInput.placeholder = "Storyboard mode active. Ask cinematic terms, script formatting, visual setups...";
+        });
+    }
+
+    // Deep Research toggle
+    if (toggleDeepResearch) {
+        toggleDeepResearch.addEventListener("change", (e) => {
+            isDeepResearch = e.target.checked;
+            if (deepResearchBadgeFollowup) {
+                if (isDeepResearch) {
+                    deepResearchBadgeFollowup.className = "attached-dir-badge"; // Display active
+                } else {
+                    deepResearchBadgeFollowup.className = "badge-hidden";
+                }
+            }
+        });
+    }
+
+    // Attach local folder buttons
+    const handleAttachDir = async () => {
+        try {
+            if (window.electronAPI && window.electronAPI.selectDirectory) {
+                const path = await window.electronAPI.selectDirectory();
+                if (path) {
+                    attachedDirectory = path;
+                    showToast(`Attached local directory: ${path}`);
+                    updateAttachedDirBadges();
+                }
+            } else {
+                const path = prompt("Enter local folder path manually (e.g. C:\\Projects\\Screenplays):");
+                if (path && path.trim()) {
+                    attachedDirectory = path.trim();
+                    showToast(`Attached local directory: ${attachedDirectory}`);
+                    updateAttachedDirBadges();
+                }
+            }
+        } catch (e) {
+            console.error("Failed to select directory:", e);
+        }
+    };
+
+    if (btnAttachDir) btnAttachDir.addEventListener("click", handleAttachDir);
+    if (btnAttachDirFollowup) btnAttachDirFollowup.addEventListener("click", handleAttachDir);
+
+    // Detach directories on badge click
+    const handleDetachDir = () => {
+        attachedDirectory = null;
+        updateAttachedDirBadges();
+        showToast("Local directory detached.");
+    };
+    if (attachedDirBadge) attachedDirBadge.addEventListener("click", handleDetachDir);
+    if (attachedDirBadgeFollowup) attachedDirBadgeFollowup.addEventListener("click", handleDetachDir);
+
+    // Sidebar Tab Switching
+    if (tabSources && tabVisuals) {
+        tabSources.addEventListener("click", () => {
+            tabSources.classList.add("active");
+            tabVisuals.classList.remove("active");
+            sourcesTabContent.classList.add("active");
+            visualsTabContent.classList.remove("active");
+        });
+        tabVisuals.addEventListener("click", () => {
+            tabVisuals.classList.add("active");
+            tabSources.classList.remove("active");
+            visualsTabContent.classList.add("active");
+            sourcesTabContent.classList.remove("active");
+        });
+    }
+
+    // Creator Hub Modal
+    if (btnCreatorHub) {
+        btnCreatorHub.addEventListener("click", () => {
+            creatorHubModal.classList.remove("hidden");
+        });
+    }
+    if (btnCloseCreatorHub) {
+        btnCloseCreatorHub.addEventListener("click", () => {
+            creatorHubModal.classList.add("hidden");
+        });
+    }
+
+    // Lightbox overlays click to close
+    if (imageLightbox) {
+        imageLightbox.addEventListener("click", () => {
+            imageLightbox.classList.add("hidden");
+        });
+        closeLightbox.addEventListener("click", (e) => {
+            e.stopPropagation();
+            imageLightbox.classList.add("hidden");
+        });
+    }
+
+    // Global ESC key listener to close modals
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            if (creatorHubModal) creatorHubModal.classList.add("hidden");
+            if (imageLightbox) imageLightbox.classList.add("hidden");
+        }
+    });
 }
 
 // Textarea auto-resizing
@@ -513,9 +654,33 @@ async function executeSearch(query) {
     
     resultQueryTitle.innerText = query;
     
+    // Trigger Instant voice easter egg replies if query matches creator questions
+    const lowerQ = query.toLowerCase();
+    if (lowerQ.includes("who created you") || lowerQ.includes("arch ko kisne banaya") || lowerQ.includes("who made you") || lowerQ.includes("who is your creator") || lowerQ.includes("tumhe kisne banaya")) {
+        const isHindi = lowerQ.includes("kisne") || lowerQ.includes("banaya") || (appSettings && appSettings.voice_lang === "hi");
+        const voiceText = isHindi 
+            ? "Mujhe Aryan Singh ne banaya hai, jo ek developer aur filmmaker hain."
+            : "I was created by Aryan Singh, a developer and filmmaker.";
+        speakInstantEasterEgg(voiceText);
+    }
+    
+    // Display or hide creator spotlight card
+    if (lowerQ.includes("aryan singh") || lowerQ.includes("creator") || lowerQ.includes("developer") || lowerQ.includes("filmmaker")) {
+        if (creatorSpotlightWrapper) {
+            creatorSpotlightWrapper.className = "creator-spotlight-visible";
+        }
+    } else {
+        if (creatorSpotlightWrapper) {
+            creatorSpotlightWrapper.className = "creator-spotlight-hidden";
+        }
+    }
+    
     const payload = {
         query: query,
-        history_id: currentHistoryId
+        history_id: currentHistoryId,
+        deep_research: isDeepResearch,
+        local_dir: attachedDirectory,
+        storyboard_mode: (activeMode === "storyboard")
     };
     
     try {
@@ -536,6 +701,7 @@ async function executeSearch(query) {
         
         currentHistoryId = data.history_id;
         activeSources = data.sources;
+        activeImages = data.images || [];
         
         // Hide loading, show results
         searchLoading.style.display = "none";
@@ -543,6 +709,9 @@ async function executeSearch(query) {
         
         // Render sources
         renderSources(data.sources);
+        
+        // Render visuals grid
+        renderVisuals(activeImages);
         
         // Render answer
         aiAnswerBody.innerHTML = renderMarkdown(data.ai_answer);
@@ -582,6 +751,9 @@ async function executeSearch(query) {
             <p>Please make sure the backend Python server is running and check your network connection.</p>
         `;
         sourcesGrid.innerHTML = '<div class="list-empty">No sources found</div>';
+        if (visualsGrid) {
+            visualsGrid.innerHTML = '<div class="list-empty">No images found</div>';
+        }
         keyFactsWrapper.style.display = "none";
         followUpQuestions.innerHTML = "";
     }
@@ -726,6 +898,7 @@ function renderLatestTurnOnly(userMsg, assistantMsg) {
     }
     
     activeSources = assistantMsg.sources || [];
+    activeImages = assistantMsg.images || [];
     
     // Render latest query
     resultQueryTitle.innerText = userMsg.content;
@@ -742,6 +915,21 @@ function renderLatestTurnOnly(userMsg, assistantMsg) {
     
     // Render sources
     renderSources(activeSources);
+
+    // Render visuals grid
+    renderVisuals(activeImages);
+
+    // Display/hide Creator Spotlight
+    const lowerQ = userMsg.content.toLowerCase();
+    if (lowerQ.includes("aryan singh") || lowerQ.includes("creator") || lowerQ.includes("developer") || lowerQ.includes("filmmaker")) {
+        if (creatorSpotlightWrapper) {
+            creatorSpotlightWrapper.className = "creator-spotlight-visible";
+        }
+    } else {
+        if (creatorSpotlightWrapper) {
+            creatorSpotlightWrapper.className = "creator-spotlight-hidden";
+        }
+    }
 }
 
 async function reloadChatThreadHistory() {
@@ -820,6 +1008,46 @@ function renderMarkdown(md) {
 
     // Code blocks: ```javascript ... ```
     html = html.replace(/```(\w*)\n([\s\S]*?)\n```/g, (match, lang, code) => {
+        if (lang === "screenplay") {
+            const screenplayLines = code.split("\n");
+            let formattedScreenplay = "";
+            let lastWasCharacter = false;
+            let lastWasParenthetical = false;
+            
+            screenplayLines.forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed) {
+                    formattedScreenplay += "<span style='display:block; height:12px;'></span>";
+                    return;
+                }
+                
+                if (/^(INT\.|EXT\.|INT\/EXT\.|EST\.|MONTAGE|SCENE)/i.test(trimmed)) {
+                    formattedScreenplay += `<span class="screenplay-scene-heading">${trimmed}</span>`;
+                    lastWasCharacter = false;
+                    lastWasParenthetical = false;
+                }
+                else if (trimmed.startsWith("(") && trimmed.endsWith(")")) {
+                    formattedScreenplay += `<span class="screenplay-parenthetical">${trimmed}</span>`;
+                    lastWasCharacter = false;
+                    lastWasParenthetical = true;
+                }
+                else if (trimmed === trimmed.toUpperCase() && trimmed.length < 30 && !trimmed.endsWith(":") && !trimmed.endsWith(".")) {
+                    formattedScreenplay += `<span class="screenplay-character">${trimmed}</span>`;
+                    lastWasCharacter = true;
+                    lastWasParenthetical = false;
+                }
+                else {
+                    if (lastWasCharacter || lastWasParenthetical) {
+                        formattedScreenplay += `<span class="screenplay-dialogue">${trimmed}</span>`;
+                    } else {
+                        formattedScreenplay += `<span class="screenplay-action">${trimmed}</span>`;
+                        lastWasCharacter = false;
+                        lastWasParenthetical = false;
+                    }
+                }
+            });
+            return `<pre class="code-block language-screenplay">${formattedScreenplay}</pre>`;
+        }
         return `<pre class="code-block"><code class="language-${lang}">${code}</code></pre>`;
     });
 
@@ -1058,4 +1286,86 @@ function stopSpeaking() {
         }
         currentAudio = null;
     }
+}
+
+// --- Next-Gen Helper Functions ---
+
+function updateAttachedDirBadges() {
+    if (attachedDirectory) {
+        const basename = getFolderBasename(attachedDirectory);
+        if (attachedDirBadge) {
+            attachedDirBadge.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>${basename}`;
+            attachedDirBadge.className = "attached-dir-badge";
+        }
+        if (attachedDirBadgeFollowup) {
+            attachedDirBadgeFollowup.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:2px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>${basename}`;
+            attachedDirBadgeFollowup.className = "attached-dir-badge";
+        }
+    } else {
+        if (attachedDirBadge) attachedDirBadge.className = "badge-hidden";
+        if (attachedDirBadgeFollowup) attachedDirBadgeFollowup.className = "badge-hidden";
+    }
+}
+
+function getFolderBasename(pathStr) {
+    if (!pathStr) return "";
+    const parts = pathStr.split(/[/\\]/);
+    return parts[parts.length - 1] || pathStr;
+}
+
+function renderVisuals(images) {
+    if (!visualsGrid) return;
+    visualsGrid.innerHTML = "";
+    
+    if (!images || images.length === 0) {
+        visualsGrid.innerHTML = '<div class="list-empty">No visual references found</div>';
+        return;
+    }
+    
+    images.forEach((imgUrl, index) => {
+        const card = document.createElement("div");
+        card.className = "visual-card";
+        
+        card.innerHTML = `
+            <img src="${imgUrl}" class="visual-image" loading="lazy" alt="Reference Frame ${index + 1}">
+            <div class="visual-card-overlay">
+                <div class="visual-card-title">Frame #${index + 1}</div>
+            </div>
+        `;
+        
+        card.addEventListener("click", () => {
+            if (imageLightbox && lightboxImg && lightboxCaption) {
+                lightboxImg.src = imgUrl;
+                lightboxCaption.innerText = `Reference Frame #${index + 1} (${imgUrl})`;
+                imageLightbox.classList.remove("hidden");
+            }
+        });
+        
+        visualsGrid.appendChild(card);
+    });
+}
+
+function speakInstantEasterEgg(text) {
+    fetch(`${API_BASE}/api/tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("TTS synthesis failed");
+        return res.blob();
+    })
+    .then(blob => {
+        const audioUrl = URL.createObjectURL(blob);
+        const easterEggAudio = new Audio(audioUrl);
+        easterEggAudio.play().then(() => {
+            easterEggAudio.onended = () => {
+                URL.revokeObjectURL(audioUrl);
+            };
+        }).catch(err => {
+            console.error("Instant voice synthesis playback failed:", err);
+            URL.revokeObjectURL(audioUrl);
+        });
+    })
+    .catch(e => console.error("Easter egg voice synthesis endpoint error:", e));
 }

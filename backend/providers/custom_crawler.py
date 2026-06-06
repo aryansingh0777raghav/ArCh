@@ -42,14 +42,15 @@ class CustomCrawlerProvider(SearchProvider):
                 print(f"Error reading cache for query '{query}': {e}")
         return None
 
-    def _set_cached_results(self, query: str, sources: list, context: str):
+    def _set_cached_results(self, query: str, sources: list, context: str, images: list = None):
         cache_file = self._get_cache_path(query)
         try:
             cache_data = {
                 "query": query,
                 "timestamp": datetime.utcnow().isoformat(),
                 "sources": sources,
-                "context": context
+                "context": context,
+                "images": images or []
             }
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(cache_data, f, indent=2, ensure_ascii=False)
@@ -57,15 +58,16 @@ class CustomCrawlerProvider(SearchProvider):
         except Exception as e:
             print(f"Error writing cache for query '{query}': {e}")
 
-    async def _fetch_target_content(self, session: aiohttp.ClientSession, url: str) -> str:
+    async def _fetch_target_content(self, session: aiohttp.ClientSession, url: str) -> dict:
         """
-        Asynchronously fetches and cleans the main text content from a target URL.
+        Asynchronously fetches, cleans the main text content, and extracts image URLs from a target URL.
         """
+        res_dict = {"text": "", "images": []}
         if not url or not (url.startswith("http://") or url.startswith("https://")):
-            return ""
+            return res_dict
             
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, with Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
         
         try:
@@ -77,7 +79,35 @@ class CustomCrawlerProvider(SearchProvider):
                     html = await response.text()
                     soup = BeautifulSoup(html, "html.parser")
                     
-                    # Decompose scripts, styles, forms, and common navigation items
+                    # 1. Extract high-quality images before decomposing elements
+                    images = []
+                    
+                    # Check OpenGraph and Twitter images
+                    og_img = soup.find("meta", property="og:image")
+                    if og_img and og_img.get("content"):
+                        images.append(urllib.parse.urljoin(url, og_img.get("content")))
+                        
+                    tw_img = soup.find("meta", name="twitter:image")
+                    if tw_img and tw_img.get("content"):
+                        images.append(urllib.parse.urljoin(url, tw_img.get("content")))
+                        
+                    # Check body images
+                    for img in soup.find_all("img"):
+                        src = img.get("src")
+                        if src:
+                            full_src = urllib.parse.urljoin(url, src)
+                            if not full_src.startswith("data:"):
+                                src_lower = full_src.lower()
+                                # Filter tracking pixels, icons, user avatars, buttons, loaders
+                                if not any(term in src_lower for term in ["logo", "icon", "avatar", "loader", "ad", "button", "spinner", "tracker", "pixel", "banner"]):
+                                    if any(ext in src_lower for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]):
+                                        images.append(full_src)
+                                        
+                    # Deduplicate images preserving order
+                    seen_img = set()
+                    res_dict["images"] = [img for img in images if not (img in seen_img or seen_img.add(img))][:10]
+
+                    # 2. Decompose scripts, styles, forms, and common navigation items
                     for element in soup(["script", "style", "noscript", "iframe", "header", "footer", "nav", "aside", "form"]):
                         element.decompose()
                         
@@ -93,22 +123,19 @@ class CustomCrawlerProvider(SearchProvider):
                     
                     for el in text_elements:
                         text = el.get_text(strip=True)
-                        # Filter out short segments (typically links or header residue)
                         if len(text) > 40:
                             text_blocks.append(text)
                             
-                    # Combine text, collapse whitespace
                     combined_text = "\n".join(text_blocks)
                     cleaned_text = re.sub(r'\s+', ' ', combined_text).strip()
-                    
-                    # Limit output content per site to 3000 characters to manage LLM context sizes
-                    return cleaned_text[:3000]
+                    res_dict["text"] = cleaned_text[:3000]
+                    return res_dict
                 else:
                     print(f"Crawler: Target URL '{url}' returned status {response.status}")
-                    return ""
+                    return res_dict
         except Exception as e:
             print(f"Crawler: Error fetching target content from '{url}': {e}")
-            return ""
+            return res_dict
 
     async def search(self, query: str, api_key: str = None) -> dict:
         """
@@ -116,12 +143,15 @@ class CustomCrawlerProvider(SearchProvider):
         {
            "query": str,
            "sources": list of dict,
-           "context": str (Rich text context combined from target pages)
+           "context": str (Rich text context combined from target pages),
+           "images": list of str (Image URLs for visual board)
         }
         """
         # 1. Check local cache
         cached = self._get_cached_results(query)
         if cached:
+            if "images" not in cached:
+                cached["images"] = []
             return cached
 
         # 2. Perform live DuckDuckGo HTML crawl
@@ -148,7 +178,6 @@ class CustomCrawlerProvider(SearchProvider):
                                 title = title_a.get_text(strip=True)
                                 raw_url = title_a.get("href", "")
                                 
-                                # Resolve DuckDuckGo redirects
                                 parsed_url = raw_url
                                 if "uddg=" in raw_url:
                                     try:
@@ -172,7 +201,6 @@ class CustomCrawlerProvider(SearchProvider):
         except Exception as e:
             print(f"Crawler: Error scraping DuckDuckGo: {e}")
 
-        # Fallback to dynamic queries if zero results scraped (offline or rate-limited)
         if not sources:
             print("Crawler: No results scraped, constructing search fallback.")
             sources = self._get_dynamic_fallback(query)
@@ -180,37 +208,46 @@ class CustomCrawlerProvider(SearchProvider):
         # 3. Retrieve target contents from top 3 search results concurrently
         context_blocks = []
         top_sources = sources[:3]
+        all_images = []
         
-        print(f"Crawler: Concurrently fetching target content from {len(top_sources)} sources...")
+        print(f"Crawler: Concurrently fetching target content and images from {len(top_sources)} sources...")
         
         try:
             async with aiohttp.ClientSession() as session:
                 tasks = [self._fetch_target_content(session, src["url"]) for src in top_sources]
-                contents = await asyncio.gather(*tasks)
+                results = await asyncio.gather(*tasks)
                 
-                for idx, text in enumerate(contents):
+                for idx, res_dict in enumerate(results):
+                    text = res_dict.get("text", "")
+                    imgs = res_dict.get("images", [])
+                    if imgs:
+                        all_images.extend(imgs)
                     if text:
                         source_info = top_sources[idx]
                         context_blocks.append(f"Source [{idx + 1}] Title: {source_info['title']}\nURL: {source_info['url']}\nContent:\n{text}\n---")
         except Exception as e:
             print(f"Crawler: Error gathering target content: {e}")
 
+        # Deduplicate all gathered images
+        seen_img = set()
+        unique_images = [img for img in all_images if not (img in seen_img or seen_img.add(img))]
+
         # Compile final context package
         if context_blocks:
             context = "\n\n".join(context_blocks)
         else:
-            # Fallback to using snippets if target fetching failed
             print("Crawler: Could not extract target page content, falling back to result snippets context.")
             snippet_blocks = [f"Source [{i+1}] Title: {s['title']}\nSnippet: {s['snippet']}" for i, s in enumerate(sources)]
             context = "\n\n".join(snippet_blocks)
 
         # 4. Save to cache
-        self._set_cached_results(query, sources, context)
+        self._set_cached_results(query, sources, context, unique_images)
 
         return {
             "query": query,
             "sources": sources,
-            "context": context
+            "context": context,
+            "images": unique_images
         }
 
     def _get_dynamic_fallback(self, query: str) -> list:

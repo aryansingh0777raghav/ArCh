@@ -187,6 +187,20 @@ ipcMain.on('open-external', (event, url) => {
     }
 });
 
+// IPC handler to select a directory natively
+ipcMain.handle('select-directory', async () => {
+    const { dialog } = require('electron');
+    const result = await dialog.showOpenDialog(mainWindow, {
+        title: 'Attach Local Directory to ArCh',
+        properties: ['openDirectory']
+    });
+    if (result.canceled) {
+        return null;
+    } else {
+        return result.filePaths[0];
+    }
+});
+
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit();

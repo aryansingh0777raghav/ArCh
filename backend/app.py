@@ -1,6 +1,8 @@
 import os
+import re
 import json
 import uuid
+import asyncio
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Body, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -103,6 +105,9 @@ class TTSRequest(BaseModel):
 class SearchRequest(BaseModel):
     query: str
     history_id: Optional[str] = None
+    deep_research: bool = False
+    local_dir: Optional[str] = None
+    storyboard_mode: bool = False
 
 # Endpoints
 
@@ -195,6 +200,117 @@ async def remove_bookmark(payload: dict = Body(...)):
     write_json_file(BOOKMARKS_FILE, filtered_bookmarks)
     return {"status": "success"}
 
+def scan_and_rank_local_files(query: str, local_dir: str) -> tuple:
+    """
+    Scans local directory recursively (ignoring common build/meta dirs),
+    chunks readable files (including PDFs via PyPDF2),
+    scores them against the query, and returns (context_str, sources_list).
+    """
+    if not os.path.exists(local_dir) or not os.path.isdir(local_dir):
+        return "", []
+        
+    stop_words = {"the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "with", "by", "of", "about", "my", "your", "our", "their", "is", "are", "was", "were", "be", "been", "have", "has", "had", "do", "does", "did"}
+    
+    keywords = [w.strip(".,;:?!'\"()[]{}").lower() for w in query.split()]
+    keywords = [w for w in keywords if len(w) >= 2 and w not in stop_words]
+    
+    if not keywords:
+        keywords = [w.lower() for w in query.split() if w]
+        
+    ignored_dirs = {".git", "node_modules", "__pycache__", "venv", ".venv", "env", "dist", "build", "storage", "cache"}
+    allowed_exts = {".txt", ".md", ".py", ".js", ".ts", ".html", ".css", ".json", ".fountain", ".sh", ".bat", ".cpp", ".h", ".cs", ".java", ".pdf"}
+    
+    chunks = []
+    base_depth = local_dir.rstrip(os.sep).count(os.sep)
+    
+    for root, dirs, files in os.walk(local_dir):
+        dirs[:] = [d for d in dirs if d not in ignored_dirs]
+        
+        current_depth = root.count(os.sep) - base_depth
+        if current_depth > 4:
+            dirs[:] = []
+            continue
+            
+        for file in files:
+            name, ext = os.path.splitext(file)
+            ext = ext.lower()
+            if ext not in allowed_exts:
+                continue
+                
+            file_path = os.path.join(root, file)
+            rel_path = os.path.relpath(file_path, local_dir)
+            file_text = ""
+            
+            try:
+                if ext == ".pdf":
+                    import PyPDF2
+                    with open(file_path, "rb") as f:
+                        reader = PyPDF2.PdfReader(f)
+                        text_list = []
+                        for page_num in range(min(len(reader.pages), 25)):
+                            p_text = reader.pages[page_num].extract_text()
+                            if p_text:
+                                text_list.append(p_text)
+                        file_text = "\n".join(text_list)
+                else:
+                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                        file_text = f.read()
+            except Exception as e:
+                print(f"RAG: Error reading file {file_path}: {e}")
+                continue
+                
+            if not file_text or not file_text.strip():
+                continue
+                
+            chunk_size = 800
+            overlap = 100
+            start = 0
+            while start < len(file_text):
+                end = start + chunk_size
+                chunk_body = file_text[start:end]
+                
+                score = 0
+                chunk_lower = chunk_body.lower()
+                
+                for kw in keywords:
+                    count = chunk_lower.count(kw)
+                    score += count * 2
+                    
+                    if kw in rel_path.lower():
+                        score += 5
+                        
+                if score > 0:
+                    chunks.append({
+                        "file_path": file_path,
+                        "rel_path": rel_path,
+                        "snippet": chunk_body.strip(),
+                        "score": score
+                    })
+                    
+                start += chunk_size - overlap
+                
+    chunks.sort(key=lambda x: x["score"], reverse=True)
+    top_chunks = chunks[:8]
+    
+    if not top_chunks:
+        return "", []
+        
+    context_list = []
+    sources_list = []
+    
+    for idx, c in enumerate(top_chunks):
+        context_list.append(f"Local Source [{idx+1}] File: {c['rel_path']}\nContent:\n{c['snippet']}\n---")
+        snippet_summary = c['snippet'][:150].replace('\n', ' ') + "..."
+        file_url = "file:///" + c['file_path'].replace('\\', '/')
+        sources_list.append({
+            "title": f"[Local File] {c['rel_path']}",
+            "url": file_url,
+            "snippet": snippet_summary
+        })
+        
+    local_context = "\n\n".join(context_list)
+    return local_context, sources_list
+
 @app.post("/api/search")
 async def perform_search(request: SearchRequest):
     settings = get_effective_settings()
@@ -240,11 +356,53 @@ async def perform_search(request: SearchRequest):
         rewritten_query = await search_bot.rewrite_query(request.query, simplified_history, groq_api_key)
         
     # 4. Perform Search (Crawl target content)
-    print(f"Searching custom crawler for query: '{rewritten_query}'")
-    crawl_results = await provider.search(rewritten_query)
-    search_results = crawl_results.get("sources", [])
-    context_text = crawl_results.get("context", "")
+    context_text = ""
+    search_results = []
+    crawl_images = []
     
+    if request.deep_research:
+        print(f"Deep Research Mode active. Splitting query: '{rewritten_query}'")
+        sub_queries = await search_bot.generate_sub_queries(rewritten_query, groq_api_key)
+        print(f"Sub-queries generated: {sub_queries}")
+        
+        all_queries = [rewritten_query] + sub_queries
+        tasks = [provider.search(q) for q in all_queries]
+        results = await asyncio.gather(*tasks)
+        
+        seen_urls = set()
+        seen_images = set()
+        context_blocks = []
+        
+        for idx, res in enumerate(results):
+            for src in res.get("sources", []):
+                if src["url"] not in seen_urls:
+                    seen_urls.add(src["url"])
+                    search_results.append(src)
+            q_context = res.get("context", "")
+            if q_context:
+                context_blocks.append(f"--- Sub-Research Context for query '{all_queries[idx]}': ---\n{q_context}")
+            for img in res.get("images", []):
+                if img not in seen_images:
+                    seen_images.add(img)
+                    crawl_images.append(img)
+                    
+        context_text = "\n\n".join(context_blocks)
+    else:
+        print(f"Searching custom crawler for query: '{rewritten_query}'")
+        crawl_results = await provider.search(rewritten_query)
+        search_results = crawl_results.get("sources", [])
+        context_text = crawl_results.get("context", "")
+        crawl_images = crawl_results.get("images", [])
+
+    # 4.5 Handle Local Directory RAG
+    if request.local_dir and os.path.exists(request.local_dir):
+        print(f"Local Hybrid Search active on path: {request.local_dir}")
+        local_context, local_sources = scan_and_rank_local_files(rewritten_query, request.local_dir)
+        if local_context:
+            context_text = f"--- LOCAL ENVIRONMENT FILES CONTEXT (ATTACHED DIRECTORY) ---\n{local_context}\n\n" + context_text
+            search_results = local_sources + search_results
+            print(f"RAG: Added {len(local_sources)} local files to context and search sources.")
+
     # 5. Generate AI Answer using Groq
     simplified_history = []
     for msg in messages:
@@ -259,7 +417,8 @@ async def perform_search(request: SearchRequest):
         sources=search_results,
         history=simplified_history,
         api_key=groq_api_key,
-        model=groq_model
+        model=groq_model,
+        storyboard_mode=request.storyboard_mode
     )
     
     # 6. Update History Messages
@@ -276,6 +435,7 @@ async def perform_search(request: SearchRequest):
             "follow_ups": ai_response.get("follow_ups", [])
         }),
         "sources": search_results,
+        "images": crawl_images,
         "timestamp": datetime.utcnow().isoformat()
     }
     
@@ -298,7 +458,8 @@ async def perform_search(request: SearchRequest):
         "ai_answer": ai_response.get("answer", ""),
         "key_facts": ai_response.get("key_facts", []),
         "follow_ups": ai_response.get("follow_ups", []),
-        "sources": search_results
+        "sources": search_results,
+        "images": crawl_images
     }
 
 @app.get("/api/stt")

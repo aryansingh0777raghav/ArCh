@@ -71,7 +71,10 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                     <span>Settings</span>
                 </button>
-                <div class="developer-tag">By Aryan Singh</div>
+                <button id="btn-creator-hub" class="sidebar-btn creator-hub-btn" title="Creator Hub">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+                    <span>Creator Hub</span>
+                </button>
             </div>
         </aside>
 
@@ -84,10 +87,35 @@
                     <div class="large-logo">Ar<span>Ch</span></div>
                     <div class="home-tagline">Search Smarter. Think Faster.</div>
                     
+                    <!-- Mode Switcher Tabs -->
+                    <div class="mode-tabs">
+                        <button class="mode-tab active" id="tab-mode-standard">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <span>Standard Search</span>
+                        </button>
+                        <button class="mode-tab" id="tab-mode-storyboard">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>
+                            <span>Storyboard Mode</span>
+                        </button>
+                    </div>
+
                     <!-- Search Input Box -->
                     <div class="search-box-container">
                         <textarea id="search-input" placeholder="Ask anything... (e.g. Who is Aryan Singh Filmmaker from Gorakhpur?)" rows="1"></textarea>
                         <div class="search-actions">
+                            <button id="btn-attach-dir" class="btn-action-icon" title="Attach Local Directory">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+                            </button>
+                            <span id="attached-dir-badge" class="badge-hidden" title="Click to detach directory">📁 attached</span>
+                            
+                            <div class="toggle-container" title="Deep Agentic Research">
+                                <span class="toggle-label">Deep Research</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="toggle-deep-research">
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+                            
                             <button id="btn-voice" class="btn-action-icon" title="Voice Search">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
                             </button>
@@ -143,6 +171,39 @@
                     <!-- Left Column: Conversational Thread & AI Summaries -->
                     <div class="results-main-col">
                         
+                        <!-- Creator Spotlight Card Wrapper -->
+                        <div id="creator-spotlight-wrapper" class="creator-spotlight-hidden">
+                            <div class="creator-spotlight-card">
+                                <div class="spotlight-badge">CREATOR SPOTLIGHT</div>
+                                <div class="spotlight-content">
+                                    <div class="spotlight-avatar">AS</div>
+                                    <div class="spotlight-details">
+                                        <h3>Aryan Singh</h3>
+                                        <p class="spotlight-title">Creator & Filmmaker</p>
+                                        <p class="spotlight-tagline">Crafting stories through code and lenses.</p>
+                                    </div>
+                                </div>
+                                <div class="spotlight-links">
+                                    <a href="#" class="spotlight-link-btn" onclick="window.electronAPI.openExternal('https://github.com/aryansingh0777raghav'); return false;" title="GitHub">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+                                        <span>GitHub</span>
+                                    </a>
+                                    <a href="#" class="spotlight-link-btn" onclick="window.electronAPI.openExternal('https://linkedin.com/in/aryansingh0777'); return false;" title="LinkedIn">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+                                        <span>LinkedIn</span>
+                                    </a>
+                                    <a href="#" class="spotlight-link-btn" onclick="window.electronAPI.openExternal('https://youtube.com/@aryansingh0777'); return false;" title="YouTube">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"></path><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon></svg>
+                                        <span>YouTube</span>
+                                    </a>
+                                    <a href="#" class="spotlight-link-btn" onclick="window.electronAPI.openExternal('https://github.com/aryansingh0777raghav/ArCh'); return false;" title="Portfolio">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7a2 2 0 0 0-2-2h-4l-3-3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2z"></path></svg>
+                                        <span>Portfolio</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Conversational Container (keeps previous thread turns if continuing) -->
                         <div id="chat-thread-container"></div>
                         
@@ -192,6 +253,12 @@
 
                         <!-- Conversational Search Bar (Bottom of results) -->
                         <div class="conversational-box">
+                            <button id="btn-attach-dir-followup" class="btn-action-icon-tiny" title="Attach Local Directory">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+                            </button>
+                            <span id="attached-dir-badge-followup" class="badge-hidden" title="Click to detach directory">📁 attached</span>
+                            <span id="deep-research-badge-followup" class="badge-hidden" title="Deep Research is enabled">🔍 Deep</span>
+                            
                             <textarea id="follow-up-input" placeholder="Ask a follow-up question..." rows="1"></textarea>
                             <button id="btn-voice-followup" class="btn-action-icon" title="Voice Search" style="margin-right: 4px;">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
@@ -203,14 +270,31 @@
 
                     </div>
 
-                    <!-- Right Column: Citations / Sources -->
+                    <!-- Right Column: Tabbed Sidebar -->
                     <div class="results-side-col">
-                        <div class="side-col-header">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-                            <span>Sources</span>
+                        <div class="side-col-tabs">
+                            <button class="side-tab active" id="tab-sources">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+                                <span>Sources</span>
+                            </button>
+                            <button class="side-tab" id="tab-visuals">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                                <span>Visual Board</span>
+                            </button>
                         </div>
-                        <div id="sources-grid" class="sources-grid">
-                            <!-- Card list of sources -->
+                        
+                        <!-- Sources Tab Content -->
+                        <div id="sources-tab-content" class="tab-content active">
+                            <div id="sources-grid" class="sources-grid">
+                                <!-- Card list of sources -->
+                            </div>
+                        </div>
+                        
+                        <!-- Visual Board Tab Content -->
+                        <div id="visuals-tab-content" class="tab-content">
+                            <div id="visuals-grid" class="visuals-grid">
+                                <!-- Cinematic image board grid -->
+                            </div>
                         </div>
                     </div>
 
@@ -290,6 +374,79 @@
 
     <!-- Notification Toast -->
     <div id="toast" class="toast-hidden">Settings saved successfully!</div>
+
+    <!-- Creator Hub Modal -->
+    <div id="creator-hub-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-modal">
+            <div class="modal-header">
+                <div class="modal-title-logo">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+                    <span>Aryan Singh - Creator Hub</span>
+                </div>
+                <button id="btn-close-creator-hub" class="btn-close-modal">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="creator-profile-info">
+                    <div class="creator-avatar-placeholder">AS</div>
+                    <div class="creator-bio">
+                        <h3>Aryan Singh</h3>
+                        <p class="tagline">Developer & Filmmaker from Gorakhpur</p>
+                        <p class="desc">Crafting stories through code and lenses. Building next-generation AI platforms like ArCh and ArKon, alongside cinematic projects.</p>
+                    </div>
+                </div>
+                
+                <div class="projects-section">
+                    <h4>Active Projects</h4>
+                    
+                    <!-- Project ArCh -->
+                    <div class="project-progress-card">
+                        <div class="project-info">
+                            <span class="project-name">ArCh (Aryan Search Engine)</span>
+                            <span class="project-pct">90%</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" style="width: 90%;"></div>
+                        </div>
+                        <p class="project-desc">AI-powered, 100% free search engine with Deep Research and local directory indexing.</p>
+                    </div>
+                    
+                    <!-- Project ArKon -->
+                    <div class="project-progress-card">
+                        <div class="project-info">
+                            <span class="project-name">ArKon (Personal AI Desktop Assistant)</span>
+                            <span class="project-pct">75%</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" style="width: 75%;"></div>
+                        </div>
+                        <p class="project-desc">Personal desktop voice assistant with deep system integrations and offline support.</p>
+                    </div>
+                    
+                    <!-- Cinematic Projects -->
+                    <div class="project-progress-card">
+                        <div class="project-info">
+                            <span class="project-name">Latest Film (Cinematic Portfolio)</span>
+                            <span class="project-pct">85%</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" style="width: 85%;"></div>
+                        </div>
+                        <p class="project-desc">Short films, screenplay writing, and cinematic video direction utilizing high-end visuals.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lightbox for Image Zoom -->
+    <div id="image-lightbox" class="lightbox-overlay hidden">
+        <span class="close-lightbox">&times;</span>
+        <img class="lightbox-content" id="lightbox-img">
+        <div id="lightbox-caption"></div>
+    </div>
 
     <!-- App JavaScript -->
     <script src="script.js"></script>
