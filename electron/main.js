@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const http = require('http');
 const kill = require('tree-kill');
 
@@ -155,10 +155,67 @@ function pollBackendAndStart(retries = 0, maxRetries = 20) {
     });
 }
 
+function cleanPort8000(callback) {
+    console.log('Checking for zombie processes on port 8000...');
+    const cmd = process.platform === 'win32' 
+        ? 'netstat -ano | findstr :8000' 
+        : 'lsof -i :8000 -t';
+        
+    exec(cmd, (err, stdout, stderr) => {
+        if (!stdout || stdout.trim() === '') {
+            console.log('Port 8000 is clean.');
+            callback();
+            return;
+        }
+        
+        const pids = new Set();
+        if (process.platform === 'win32') {
+            const lines = stdout.split('\n');
+            for (let line of lines) {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length >= 5) {
+                    const pid = parts[parts.length - 1];
+                    if (pid && pid !== '0') {
+                        pids.add(pid);
+                    }
+                }
+            }
+        } else {
+            stdout.split('\n').forEach(pid => {
+                const trimmed = pid.trim();
+                if (trimmed) pids.add(trimmed);
+            });
+        }
+        
+        if (pids.size === 0) {
+            callback();
+            return;
+        }
+        
+        console.log(`Killing zombie PIDs on port 8000: ${Array.from(pids).join(', ')}`);
+        let killCmd = '';
+        if (process.platform === 'win32') {
+            killCmd = `taskkill /F ${Array.from(pids).map(pid => `/PID ${pid}`).join(' ')}`;
+        } else {
+            killCmd = `kill -9 ${Array.from(pids).join(' ')}`;
+        }
+        
+        exec(killCmd, (killErr) => {
+            if (killErr) {
+                console.error('Error killing zombie processes:', killErr);
+            } else {
+                console.log('Zombie processes killed successfully.');
+            }
+            setTimeout(callback, 800);
+        });
+    });
+}
+
 app.on('ready', () => {
     createSplashWindow();
-    // Start polling the backend after a brief delay
-    setTimeout(() => pollBackendAndStart(), 500);
+    cleanPort8000(() => {
+        pollBackendAndStart();
+    });
 });
 
 // IPC handlers for Frameless window controls
