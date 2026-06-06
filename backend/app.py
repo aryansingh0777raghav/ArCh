@@ -356,7 +356,23 @@ async def perform_search(request: SearchRequest):
         
     # 3. Rewrite query for conversational search
     rewritten_query = request.query
-    if messages:
+    
+    # Intercept "about me" / "mere baare me" queries to fetch full info of Aryan Singh
+    lower_q = request.query.lower().strip()
+    about_me_phrases = [
+        "mere baare me", "mere bare me", "mere baare mein", "mere bare mein", "mere baare m", "mere bare m",
+        "who am i", "know about me", "tell me about myself", "find about me", "search about me", "find out about me",
+        "mere baare me pta lgao", "mere bare me pata lagao", "mere bare me pata karo", "mere baare me pta karo",
+        "mere baare me search karo", "mere bare me search karo",
+        "tell me about yourself", "who are you", "what is your name", "introduce yourself", "about yourself",
+        "describe yourself", "who are u", "tell me about u"
+    ]
+    
+    is_about_me = any(phrase in lower_q for phrase in about_me_phrases)
+    if is_about_me:
+        rewritten_query = "Aryan Singh developer filmmaker Gorakhpur"
+        request.deep_research = True  # Force deep research to get full internet search results
+    elif messages:
         # Pass messages history to rewrite query
         simplified_history = []
         for msg in messages:

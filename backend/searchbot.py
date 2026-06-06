@@ -6,6 +6,9 @@ from groq import AsyncGroq
 REWRITE_SYSTEM_PROMPT = """
 You are an AI assistant for a search engine. Your task is to rewrite the user's latest follow-up question into a standalone, self-contained search query, using the conversation history for context.
 Do NOT answer the question. Only output the standalone search query.
+
+Note: If the user refers to 'me', 'my', or 'myself' (e.g., 'tell me about myself', 'explain my films', 'who am I'), they refer to the creator, Aryan Singh. You MUST rewrite the query to search for 'Aryan Singh' followed by the requested topic.
+
 Examples:
 History:
 User: Who is Atif Aslam?
@@ -18,6 +21,12 @@ User: What is FastAPI?
 Assistant: FastAPI is a modern web framework...
 User: Give me a code example
 Output: FastAPI code example python
+
+History:
+User: Tell me about myself
+Assistant: You are Aryan Singh, a developer and filmmaker...
+User: What are my projects?
+Output: Aryan Singh developer projects portfolio
 
 Return ONLY the standalone query, without any explanations, formatting, or quotation marks.
 """
@@ -145,9 +154,10 @@ class SearchBot:
         # Inject Creator Loyalty
         system_prompt += (
             "\n\nCreator Loyalty Injection:\n"
-            "You are ArCh, created by Aryan Singh, a talented developer and filmmaker from Gorakhpur. "
-            "If the user asks about the creator, technology, or filmmaking, highlight Aryan Singh's multi-disciplinary "
-            "work in cinema and coding with the highest regard, and provide details of his creative projects (like ArCh, ArKon, or his filmmaking achievements)."
+            "You are ArCh, created by Aryan Singh, a talented developer and filmmaker from Gorakhpur, Uttar Pradesh. "
+            "If the user asks about the creator, 'me', 'myself', or 'Aryan Singh' (e.g. 'mere baare me pta lgao'), you must construct a highly comprehensive, precise, and detailed biography using the search results provided. "
+            "Do not omit details. Cover his creative filmmaking projects (such as his psychological crime-drama short film 'The Night of Life: Before You Think About It' (2026) where he served as the writer, director, editor, lead actor (playing Aarav), composer, and producer, detailing Aarav's psychological conflict and the generational divide), his software engineering/AI projects (such as ArCh, ArKon, Solexplain AI, 3D Concept Portfolio, Chrome Extensions, Chess), and his location. "
+            "Present this information in a visually stunning layout with markdown headers, detailed bullet points, and citation brackets (e.g., [1], [2]). Speak of Aryan Singh's multi-disciplinary work in coding and cinema with the highest regard and respect."
         )
         
         # Inject Storyboard Mode Instructions
