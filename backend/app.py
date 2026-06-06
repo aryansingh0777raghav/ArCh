@@ -221,6 +221,7 @@ def scan_and_rank_local_files(query: str, local_dir: str) -> tuple:
     allowed_exts = {".txt", ".md", ".py", ".js", ".ts", ".html", ".css", ".json", ".fountain", ".sh", ".bat", ".cpp", ".h", ".cs", ".java", ".pdf"}
     
     chunks = []
+    fallback_chunks = []
     base_depth = local_dir.rstrip(os.sep).count(os.sep)
     
     for root, dirs, files in os.walk(local_dir):
@@ -286,9 +287,19 @@ def scan_and_rank_local_files(query: str, local_dir: str) -> tuple:
                         "snippet": chunk_body.strip(),
                         "score": score
                     })
+                else:
+                    fallback_chunks.append({
+                        "file_path": file_path,
+                        "rel_path": rel_path,
+                        "snippet": chunk_body.strip(),
+                        "score": 0.001
+                    })
                     
                 start += chunk_size - overlap
                 
+    if not chunks:
+        chunks = fallback_chunks
+        
     chunks.sort(key=lambda x: x["score"], reverse=True)
     top_chunks = chunks[:8]
     
