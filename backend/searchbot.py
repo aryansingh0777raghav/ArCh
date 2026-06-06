@@ -186,46 +186,77 @@ class SearchBot:
         messages.append({"role": "user", "content": user_content})
         
         try:
-            client = AsyncGroq(api_key=api_key)
+            attempts = 0
+            current_model = model
+            current_messages = messages
             
-            # Using JSON mode if supported by the model
-            response = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=0.3,
-                max_tokens=4000,
-                response_format={"type": "json_object"}
-            )
-            raw_response = response.choices[0].message.content.strip()
-            
-        except Exception as e:
-            err_msg = str(e)
-            if ("rate_limit" in err_msg.lower() or "429" in err_msg) and model != "llama-3.1-8b-instant":
-                print(f"SearchBot: Rate limit (429) hit for {model}. Retrying with fast fallback model llama-3.1-8b-instant...")
+            while attempts < 3:
+                attempts += 1
                 try:
                     client = AsyncGroq(api_key=api_key)
+                    
+                    # Using JSON mode if supported by the model
                     response = await client.chat.completions.create(
-                        model="llama-3.1-8b-instant",
-                        messages=messages,
+                        model=current_model,
+                        messages=current_messages,
                         temperature=0.3,
                         max_tokens=4000,
                         response_format={"type": "json_object"}
                     )
                     raw_response = response.choices[0].message.content.strip()
-                except Exception as retry_err:
-                    print(f"SearchBot: Fallback to llama-3.1-8b-instant also failed: {retry_err}")
-                    return {
-                        "answer": f"Groq API Rate Limit reached for {model}, and fallback model also failed: {str(retry_err)}.\n\nPlease try again in a few minutes or configure a different Groq API key.",
-                        "key_facts": [],
-                        "follow_ups": [f"Retry: {query}"]
-                    }
-            else:
-                print(f"Error calling Groq API: {e}")
-                return {
-                    "answer": f"An error occurred while generating the AI answer: {str(e)}.\n\nPlease verify your Groq API Key and internet connection.",
-                    "key_facts": [],
-                    "follow_ups": [f"Retry: {query}"]
-                }
+                    break
+                except Exception as e:
+                    err_msg = str(e)
+                    print(f"SearchBot (Attempt {attempts}/3): Error calling Groq with {current_model}: {err_msg}")
+                    
+                    # Check for rate limit / token limit (429)
+                    is_429 = "429" in err_msg or "rate_limit" in err_msg.lower()
+                    # Check for context size / request too large (413)
+                    is_413 = "413" in err_msg or "request too large" in err_msg.lower() or "tpm" in err_msg.lower() or "too large" in err_msg.lower()
+                    
+                    if not (is_429 or is_413):
+                        # For other exceptions (like invalid API key, network error), raise immediately
+                        raise e
+                        
+                    if attempts >= 3:
+                        # No more attempts left, raise the exception to the outer handler
+                        raise e
+                        
+                    # Handle self-healing adjustments for the next attempt
+                    if is_429:
+                        if current_model != "llama-3.1-8b-instant":
+                            print(f"SearchBot: Daily token limit reached for {current_model}. Switching to llama-3.1-8b-instant...")
+                            current_model = "llama-3.1-8b-instant"
+                        else:
+                            raise e
+                    
+                    # Re-calculate messages with trimmed context if it's too large or we hit a 413
+                    total_chars = sum(len(m["content"]) for m in current_messages)
+                    # If we hit a 413 or are switching to 8b (which has a strict TPM limit of 6k tokens ~24k chars, safe limit 15k chars)
+                    safe_char_limit = 15000 if is_413 else 18000
+                    
+                    if total_chars > safe_char_limit:
+                        print(f"SearchBot: Request length ({total_chars} chars) is too large. Truncating context for retry...")
+                        system_and_history_chars = sum(len(m["content"]) for m in messages[:-1])
+                        user_meta_chars = len(f"Query: {query}\n\nSearch Sources References:\n{formatted_sources}\n\nExtracted Web Page Content Context:\n\n\nPlease generate the cited answer in JSON format.")
+                        allowed_context_chars = max(1500, safe_char_limit - system_and_history_chars - user_meta_chars)
+                        
+                        trimmed_context = context[:allowed_context_chars] + f"\n\n[Context truncated to fit rate limits...]"
+                        
+                        fallback_user_content = (
+                            f"Query: {query}\n\n"
+                            f"Search Sources References:\n{formatted_sources}\n"
+                            f"Extracted Web Page Content Context:\n{trimmed_context}\n\n"
+                            f"Please generate the cited answer in JSON format."
+                        )
+                        current_messages = messages[:-1] + [{"role": "user", "content": fallback_user_content}]
+        except Exception as e:
+            print(f"Error calling Groq API after all attempts: {e}")
+            return {
+                "answer": f"An error occurred while generating the AI answer after self-healing attempts: {str(e)}.\n\nPlease verify your Groq API Key and internet connection.",
+                "key_facts": [],
+                "follow_ups": [f"Retry: {query}"]
+            }
 
         # Parse and process JSON response (shared success block)
         try:
