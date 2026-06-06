@@ -37,6 +37,7 @@ Rules:
   "key_facts": ["Fact 1", "Fact 2", "Fact 3"],
   "follow_ups": ["Follow up query 1", "Follow up query 2", "Follow up query 3"]
 }
+6. If the context contains a section labeled `LOCAL ENVIRONMENT FILES CONTEXT (ATTACHED DIRECTORY)`, and the user asks about "local file", "code", or specific filenames, you MUST prioritize reading, describing, and explaining the local files from that section. Do not get distracted by general web search results (such as Local File Inclusion vulnerabilities) unless the query explicitly asks about them. Focus on the actual code, structure, and text of the attached files.
 """
 
 class SearchBot:
@@ -176,13 +177,44 @@ class SearchBot:
                     pass
             messages.append({"role": role, "content": content})
             
-        # Add current request
-        user_content = (
-            f"Query: {query}\n\n"
-            f"Search Sources References:\n{formatted_sources}\n"
-            f"Extracted Web Page Content Context:\n{context}\n\n"
-            f"Please generate the cited answer in JSON format."
-        )
+        # Add current request (separating local directory files and web context for clarity)
+        local_context = ""
+        web_context = context
+        
+        marker = "--- LOCAL ENVIRONMENT FILES CONTEXT (ATTACHED DIRECTORY) ---\n"
+        if marker in context:
+            parts = context.split(marker, 1)
+            content_after = parts[1]
+            if "\n---\n\n" in content_after:
+                local_part, web_part = content_after.split("\n---\n\n", 1)
+                local_context = local_part + "\n---"
+                web_context = web_part
+            else:
+                local_context = content_after
+                web_context = ""
+
+        if local_context:
+            user_content = (
+                f"Query: {query}\n\n"
+                f"Search Sources References:\n{formatted_sources}\n"
+                f"=== CRITICAL LOCAL DIRECTORY CONTEXT ===\n"
+                f"The user has attached their local workspace directory. You MUST prioritize reading, "
+                f"analyzing, and explaining these files. They contain the actual code/files the user is asking about:\n"
+                f"{local_context}\n\n"
+                f"=== OPTIONAL WEB SEARCH CONTEXT ===\n"
+                f"The following are general web search results. Do NOT let them distract you from explaining the local files. "
+                f"Do not confuse the local files with general web concepts/definitions (such as Local File Inclusion vulnerabilities):\n"
+                f"{web_context}\n\n"
+                f"Please generate the cited answer in JSON format."
+            )
+        else:
+            user_content = (
+                f"Query: {query}\n\n"
+                f"Search Sources References:\n{formatted_sources}\n"
+                f"Extracted Web Page Content Context:\n{context}\n\n"
+                f"Please generate the cited answer in JSON format."
+            )
+            
         messages.append({"role": "user", "content": user_content})
         
         try:
