@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pydantic
+aiohttp
+beautifulsoup4
+groq
+python-dotenv
