@@ -237,12 +237,15 @@ class SearchBot:
                 try:
                     client = AsyncGroq(api_key=api_key)
                     
+                    # Adjust max_tokens dynamically to avoid TPM limit of 6k tokens for 8b model
+                    current_max_tokens = 1200 if current_model == "llama-3.1-8b-instant" else 2500
+                    
                     # Using JSON mode if supported by the model
                     response = await client.chat.completions.create(
                         model=current_model,
                         messages=current_messages,
                         temperature=0.3,
-                        max_tokens=4000,
+                        max_tokens=current_max_tokens,
                         response_format={"type": "json_object"}
                     )
                     raw_response = response.choices[0].message.content.strip()
@@ -300,7 +303,7 @@ class SearchBot:
                     # Re-calculate messages with trimmed context if it's too large or we hit a 413
                     total_chars = sum(len(m["content"]) for m in current_messages)
                     # If we hit a 413 or are switching to 8b (which has a strict TPM limit of 6k tokens ~24k chars, safe limit 15k chars)
-                    safe_char_limit = 15000 if is_413 else 18000
+                    safe_char_limit = 10000 if is_413 else 15000
                     
                     if total_chars > safe_char_limit:
                         print(f"SearchBot: Request length ({total_chars} chars) is too large. Truncating context for retry...")
