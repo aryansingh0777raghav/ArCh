@@ -357,7 +357,7 @@ async def perform_search(request: SearchRequest):
     # 3. Rewrite query for conversational search
     rewritten_query = request.query
     
-    # Intercept "about me" / "mere baare me" queries to fetch full info of Aryan Singh
+    # Intercept "about me" / "mere baare me" / creator queries to fetch full info of Aryan Singh
     lower_q = request.query.lower().strip()
     about_me_phrases = [
         "mere baare me", "mere bare me", "mere baare mein", "mere bare mein", "mere baare m", "mere bare m",
@@ -365,7 +365,10 @@ async def perform_search(request: SearchRequest):
         "mere baare me pta lgao", "mere bare me pata lagao", "mere bare me pata karo", "mere baare me pta karo",
         "mere baare me search karo", "mere bare me search karo",
         "tell me about yourself", "who are you", "what is your name", "introduce yourself", "about yourself",
-        "describe yourself", "who are u", "tell me about u"
+        "describe yourself", "who are u", "tell me about u",
+        "who created you", "who created u", "who made you", "who made u", "who is your creator", "who is your developer",
+        "who created arch", "who made arch", "who is the creator of arch", "who is the developer of arch",
+        "arch ko kisne banaya", "arch kisne banaya", "apko kisne banaya", "tumhe kisne banaya"
     ]
     
     is_about_me = any(phrase in lower_q for phrase in about_me_phrases)
